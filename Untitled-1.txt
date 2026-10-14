@@ -1,0 +1,474 @@
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local NORMAL_SPEED = 16
+local NORMAL_JUMP = 50
+
+local currentSpeed = NORMAL_SPEED
+local currentJump = NORMAL_JUMP
+local flying = false
+local flyConnection
+local flyVelocity
+local flyAttachment
+local destroyed = false
+local clickMode = false
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "DarkBuildSystem"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(440, 430)
+main.Position = UDim2.new(0.5, -220, 0.5, -215)
+main.BackgroundColor3 = Color3.fromRGB(15, 18, 25)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local outline = Instance.new("UIStroke")
+outline.Color = Color3.fromRGB(0, 230, 155)
+outline.Thickness = 1.5
+outline.Parent = main
+
+local function label(parent, text, pos, size)
+    local obj = Instance.new("TextLabel")
+    obj.Position = pos
+    obj.Size = size
+    obj.BackgroundTransparency = 1
+    obj.Text = text
+    obj.TextColor3 = Color3.fromRGB(0, 255, 170)
+    obj.Font = Enum.Font.Code
+    obj.TextSize = 15
+    obj.TextWrapped = true
+    obj.TextXAlignment = Enum.TextXAlignment.Left
+    obj.Parent = parent
+    return obj
+end
+
+local function button(parent, text, pos, size)
+    local obj = Instance.new("TextButton")
+    obj.Position = pos
+    obj.Size = size
+    obj.BackgroundColor3 = Color3.fromRGB(35, 48, 55)
+    obj.TextColor3 = Color3.fromRGB(0, 255, 170)
+    obj.Text = text
+    obj.Font = Enum.Font.Code
+    obj.TextSize = 13
+    obj.BorderSizePixel = 0
+    obj.Parent = parent
+    return obj
+end
+
+local function input(parent, placeholder, pos, size)
+    local obj = Instance.new("TextBox")
+    obj.Position = pos
+    obj.Size = size or UDim2.fromOffset(115, 35)
+    obj.BackgroundColor3 = Color3.fromRGB(35, 40, 50)
+    obj.TextColor3 = Color3.new(1, 1, 1)
+    obj.PlaceholderColor3 = Color3.fromRGB(150, 160, 170)
+    obj.PlaceholderText = placeholder
+    obj.Text = ""
+    obj.Font = Enum.Font.Code
+    obj.TextSize = 14
+    obj.ClearTextOnFocus = false
+    obj.Parent = parent
+    return obj
+end
+
+label(main, "DARK BUILD SYSTEM // V3",
+    UDim2.fromOffset(12, 5), UDim2.new(1, -115, 0, 38))
+
+local minimize = button(main, "-", UDim2.new(1, -78, 0, 7),
+    UDim2.fromOffset(32, 30))
+minimize.TextSize = 22
+
+local close = button(main, "X", UDim2.new(1, -40, 0, 7),
+    UDim2.fromOffset(32, 30))
+close.BackgroundColor3 = Color3.fromRGB(90, 30, 40)
+
+local tabs = Instance.new("Frame")
+tabs.Position = UDim2.fromOffset(10, 48)
+tabs.Size = UDim2.new(1, -20, 0, 36)
+tabs.BackgroundTransparency = 1
+tabs.Parent = main
+
+local content = Instance.new("Frame")
+content.Position = UDim2.fromOffset(10, 91)
+content.Size = UDim2.new(1, -20, 1, -101)
+content.BackgroundColor3 = Color3.fromRGB(23, 28, 37)
+content.BorderSizePixel = 0
+content.Parent = main
+
+local pages = {}
+local tabButtons = {}
+
+local function createPage(name)
+    local page = Instance.new("ScrollingFrame")
+    page.Name = name
+    page.Size = UDim2.fromScale(1, 1)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 4
+    page.CanvasSize = UDim2.fromOffset(0, 390)
+    page.Visible = false
+    page.Parent = content
+    pages[name] = page
+    return page
+end
+
+local names = {"BUILD", "MOVEMENT", "BYPASS", "SETTINGS"}
+
+local function showTab(name)
+    for n, page in pairs(pages) do
+        page.Visible = n == name
+    end
+
+    for n, b in pairs(tabButtons) do
+        b.BackgroundColor3 = n == name
+            and Color3.fromRGB(0, 110, 78)
+            or Color3.fromRGB(35, 43, 54)
+    end
+end
+
+for i, name in ipairs(names) do
+    local b = button(tabs, name,
+        UDim2.fromOffset((i - 1) * 104, 0),
+        UDim2.fromOffset(100, 36))
+    tabButtons[name] = b
+    b.Activated:Connect(function()
+        showTab(name)
+    end)
+end
+
+-- BUILD
+local buildPage = createPage("BUILD")
+label(buildPage,
+    "BUILD TOOLS\n\nUse the game's normal building tools.\nConstruction controls can be added here.",
+    UDim2.fromOffset(12, 12), UDim2.fromOffset(390, 120))
+
+-- MOVEMENT
+local movePage = createPage("MOVEMENT")
+
+label(movePage, "MOVEMENT CONTROL",
+    UDim2.fromOffset(12, 5), UDim2.fromOffset(300, 28))
+
+local flyButton = button(movePage, "FLIGHT: OFF",
+    UDim2.fromOffset(12, 40), UDim2.fromOffset(180, 35))
+
+local speedInput = input(movePage, "Speed",
+    UDim2.fromOffset(12, 82))
+local speedButton = button(movePage, "SET SPEED",
+    UDim2.fromOffset(140, 82), UDim2.fromOffset(150, 35))
+
+local jumpInput = input(movePage, "Jump power",
+    UDim2.fromOffset(12, 125))
+local jumpButton = button(movePage, "SET JUMP",
+    UDim2.fromOffset(140, 125), UDim2.fromOffset(150, 35))
+
+local resetButton = button(movePage, "RESET MOVEMENT",
+    UDim2.fromOffset(12, 168), UDim2.fromOffset(278, 35))
+
+label(movePage, "PLAYER TELEPORT",
+    UDim2.fromOffset(12, 215), UDim2.fromOffset(300, 25))
+
+local playerName = input(movePage, "Player username",
+    UDim2.fromOffset(12, 245), UDim2.fromOffset(180, 32))
+
+local teleportPlayer = button(movePage, "CHECK PLAYER",
+    UDim2.fromOffset(200, 245), UDim2.fromOffset(180, 32))
+
+local clickTeleport = button(movePage, "TELEPORT ON CLICK: OFF",
+    UDim2.fromOffset(12, 285), UDim2.fromOffset(278, 32))
+
+local teleportStatus = label(movePage, "READY",
+    UDim2.fromOffset(12, 323), UDim2.fromOffset(390, 35))
+
+-- BYPASS
+local bypassPage = createPage("BYPASS")
+label(bypassPage,
+    "BYPASS MODULE\n\nNo isolation bypass is implemented.\nUse authorized game mechanics.",
+    UDim2.fromOffset(12, 12), UDim2.fromOffset(390, 120))
+
+-- SETTINGS
+local settingsPage = createPage("SETTINGS")
+label(settingsPage, "SETTINGS\n\nDark Build System\nVersion 3.0",
+    UDim2.fromOffset(12, 12), UDim2.fromOffset(300, 90))
+
+local hideButton = button(settingsPage, "HIDE MENU",
+    UDim2.fromOffset(12, 120), UDim2.fromOffset(180, 38))
+
+-- Character helpers
+local function getHumanoid()
+    local character = player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function stopFlight()
+    flying = false
+
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+
+    if flyVelocity then
+        flyVelocity:Destroy()
+        flyVelocity = nil
+    end
+
+    if flyAttachment then
+        flyAttachment:Destroy()
+        flyAttachment = nil
+    end
+
+    if flyButton.Parent then
+        flyButton.Text = "FLIGHT: OFF"
+    end
+end
+
+local function startFlight()
+    local character = player.Character
+    local humanoid = getHumanoid()
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not root then
+        teleportStatus.Text = "CHARACTER NOT READY"
+        return
+    end
+
+    flying = true
+    flyButton.Text = "FLIGHT: ON"
+
+    flyAttachment = Instance.new("Attachment")
+    flyAttachment.Parent = root
+
+    flyVelocity = Instance.new("LinearVelocity")
+    flyVelocity.Attachment0 = flyAttachment
+    flyVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
+    flyVelocity.VelocityConstraintMode =
+        Enum.VelocityConstraintMode.Vector
+    flyVelocity.VectorVelocity = Vector3.zero
+    flyVelocity.MaxForce = 100000
+    flyVelocity.Parent = root
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flying or not root.Parent then
+            stopFlight()
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+        local direction = Vector3.zero
+
+        if UIS:IsKeyDown(Enum.KeyCode.W) then
+            direction += camera.CFrame.LookVector
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then
+            direction -= camera.CFrame.LookVector
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then
+            direction += camera.CFrame.RightVector
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then
+            direction -= camera.CFrame.RightVector
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            direction += Vector3.yAxis
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+            direction -= Vector3.yAxis
+        end
+
+        if direction.Magnitude > 0 then
+            direction = direction.Unit
+        end
+
+        flyVelocity.VectorVelocity = direction * currentSpeed
+    end)
+end
+
+flyButton.Activated:Connect(function()
+    if flying then
+        stopFlight()
+    else
+        startFlight()
+    end
+end)
+
+speedButton.Activated:Connect(function()
+    local value = tonumber(speedInput.Text)
+    if value and value >= 0 and value <= 100 then
+        currentSpeed = value
+        local h = getHumanoid()
+        if h then
+            h.WalkSpeed = value
+        end
+    else
+        teleportStatus.Text = "SPEED MUST BE 0-100"
+    end
+end)
+
+jumpButton.Activated:Connect(function()
+    local value = tonumber(jumpInput.Text)
+    if value and value >= 0 and value <= 200 then
+        currentJump = value
+        local h = getHumanoid()
+        if h then
+            h.UseJumpPower = true
+            h.JumpPower = value
+        end
+    else
+        teleportStatus.Text = "JUMP MUST BE 0-200"
+    end
+end)
+
+resetButton.Activated:Connect(function()
+    stopFlight()
+    currentSpeed = NORMAL_SPEED
+    currentJump = NORMAL_JUMP
+
+    local h = getHumanoid()
+    if h then
+        h.WalkSpeed = NORMAL_SPEED
+        h.UseJumpPower = true
+        h.JumpPower = NORMAL_JUMP
+    end
+
+    speedInput.Text = ""
+    jumpInput.Text = ""
+    teleportStatus.Text = "MOVEMENT RESET"
+end)
+
+-- Player lookup for your own game.
+-- This checks the player but does not teleport.
+teleportPlayer.Activated:Connect(function()
+    local name = playerName.Text:lower():match("^%s*(.-)%s*$")
+
+    if name == "" then
+        teleportStatus.Text = "ENTER PLAYER NAME"
+        return
+    end
+
+    local target
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower() == name then
+            target = p
+            break
+        end
+    end
+
+    if not target then
+        teleportStatus.Text = "PLAYER NOT FOUND"
+        return
+    end
+
+    teleportStatus.Text = "PLAYER FOUND: " .. target.Name
+end)
+
+-- Click mode toggle. Actual teleport is intentionally not
+-- performed by this client-only example.
+clickTeleport.Activated:Connect(function()
+    clickMode = not clickMode
+
+    clickTeleport.Text = clickMode
+        and "TELEPORT ON CLICK: ON"
+        or "TELEPORT ON CLICK: OFF"
+
+    teleportStatus.Text = clickMode
+        and "CLICK MODE ENABLED"
+        or "CLICK MODE DISABLED"
+end)
+
+-- Confirmation dialog
+local confirm = Instance.new("Frame")
+confirm.Size = UDim2.fromOffset(340, 145)
+confirm.Position = UDim2.new(0.5, -170, 0.5, -72)
+confirm.BackgroundColor3 = Color3.fromRGB(20, 24, 32)
+confirm.BorderSizePixel = 0
+confirm.Visible = false
+confirm.ZIndex = 10
+confirm.Parent = gui
+
+local confirmStroke = Instance.new("UIStroke")
+confirmStroke.Color = Color3.fromRGB(0, 230, 155)
+confirmStroke.Parent = confirm
+
+local question = Instance.new("TextLabel")
+question.Size = UDim2.new(1, -20, 0, 65)
+question.Position = UDim2.fromOffset(10, 5)
+question.BackgroundTransparency = 1
+question.Text = "Вы точно хотите убрать меню навсегда?"
+question.TextColor3 = Color3.fromRGB(0, 255, 170)
+question.TextWrapped = true
+question.Font = Enum.Font.Code
+question.TextSize = 17
+question.ZIndex = 11
+question.Parent = confirm
+
+local yes = button(confirm, "ДА",
+    UDim2.fromOffset(20, 90), UDim2.fromOffset(130, 38))
+yes.ZIndex = 11
+yes.BackgroundColor3 = Color3.fromRGB(110, 35, 45)
+
+local no = button(confirm, "НЕТ",
+    UDim2.fromOffset(190, 90), UDim2.fromOffset(130, 38))
+no.ZIndex = 11
+
+minimize.Activated:Connect(function()
+    main.Visible = false
+    confirm.Visible = false
+end)
+
+close.Activated:Connect(function()
+    confirm.Visible = true
+end)
+
+yes.Activated:Connect(function()
+    destroyed = true
+    stopFlight()
+    gui:Destroy()
+end)
+
+no.Activated:Connect(function()
+    confirm.Visible = false
+end)
+
+hideButton.Activated:Connect(function()
+    main.Visible = false
+end)
+
+UIS.InputBegan:Connect(function(inputObject, processed)
+    if processed or destroyed then
+        return
+    end
+
+    if inputObject.KeyCode == Enum.KeyCode.G
+        or inputObject.KeyCode == Enum.KeyCode.P then
+        if gui.Parent and not confirm.Visible then
+            main.Visible = true
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    stopFlight()
+    task.wait(0.5)
+
+    local h = getHumanoid()
+    if h then
+        h.WalkSpeed = NORMAL_SPEED
+        h.UseJumpPower = true
+        h.JumpPower = NORMAL_JUMP
+    end
+
+    currentSpeed = NORMAL_SPEED
+    currentJump = NORMAL_JUMP
+end)
+
+showTab("BUILD")
+print("Dark Build Sy
